@@ -1,5 +1,5 @@
 # stonk-lambda
 
-Lambda function that gathers stock data and pushes notifications to an SNS topic for stocks that reach a configured gain threshold from their previous close price
+Lambda function that pushes data to an SNS topic when a stock from Robinhood's "Top Movers" list reaches a configured regular market gain percentage threshold
 
 ![diagram](docs/diagram.png)
