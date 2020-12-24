@@ -71,6 +71,7 @@ Buy: %d
 Hold: %d
 Sell: %d
 StrongSell: %d
+https://robinhood.com/stocks/%s
 `,
 			s.Symbol,
 			s.Gain,
@@ -82,7 +83,8 @@ StrongSell: %d
 			s.Buy,
 			s.Hold,
 			s.Sell,
-			s.StrongSell))
+			s.StrongSell,
+			s.Symbol))
 	}
 	input := &sns.PublishInput{
 		Message:  aws.String(sb.String()),
