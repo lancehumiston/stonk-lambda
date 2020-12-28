@@ -6,7 +6,18 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"regexp"
+	"strings"
 )
+
+var (
+	apiKey string
+)
+
+func init() {
+	apiKey = os.Getenv("NEWS_API_KEY")
+}
 
 type movers struct {
 	InstrumentURIs []string `json:"instruments"`
@@ -32,7 +43,7 @@ func GetTopMovers() ([]string, error) {
 	return m.InstrumentURIs, nil
 }
 
-type instrument struct {
+type instrumentResponse struct {
 	Symbol string `json:"symbol"`
 }
 
@@ -49,7 +60,7 @@ func GetSymbol(instrumentURI string) (string, error) {
 		return "", err
 	}
 
-	var i instrument
+	var i instrumentResponse
 	json.Unmarshal(body, &i)
 	log.Println(i)
 
@@ -82,7 +93,7 @@ type FinancialData struct {
 	} `json:"targetMeanPrice"`
 }
 
-type quoteSummary struct {
+type quoteResponse struct {
 	Summary struct {
 		Result []struct {
 			RecommendationTrend struct {
@@ -120,7 +131,7 @@ func GetAnalysis(symbol string) (float64, RecommendationRating, FinancialData, e
 		return 0, rating, data, err
 	}
 
-	var q quoteSummary
+	var q quoteResponse
 	json.Unmarshal(body, &q)
 	log.Println(q)
 
@@ -142,4 +153,81 @@ func GetAnalysis(symbol string) (float64, RecommendationRating, FinancialData, e
 	}
 
 	return gain * 100, rating, data, nil
+}
+
+type companyResponse struct {
+	ResultSet struct {
+		Result []struct {
+			Symbol string `json:"symbol"`
+			Name   string `json:"name"`
+		} `json:"Result"`
+	} `json:"ResultSet"`
+}
+
+// GetCompanyName - Gets the company name that the symbol is associated with
+func GetCompanyName(symbol string) (string, error) {
+	resp, err := http.Get(fmt.Sprintf("https://autoc.finance.yahoo.com/autoc?lang=en&query=%s", symbol))
+	if err != nil {
+		return "", err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return "", err
+	}
+
+	var c companyResponse
+	json.Unmarshal(body, &c)
+	log.Println(c)
+
+	for _, v := range c.ResultSet.Result {
+		if v.Symbol == symbol {
+			return v.Name, nil
+		}
+	}
+
+	return "", nil
+}
+
+type newsResponse struct {
+	Articles []struct {
+		URL string `json:"url"`
+	} `json:"articles"`
+}
+
+// GetNews - Returns URL of news articles related to the company
+func GetNews(companyName string) ([]string, error) {
+	var urls = []string{}
+	if companyName == "" {
+		return urls, nil
+	}
+
+	const pageSize int = 3
+	noSuffix := regexp.MustCompile(`(?i)inc\.|(?i)Incorporated|(?i)plc|(?i)corporation|(?i)corp\.|(?i)limited|(?i)ltd\.`).ReplaceAllString(companyName, "")
+	formattedQuery := "+" + strings.Replace(noSuffix, " ", "+", -1)
+	resp, err := http.Get(fmt.Sprintf("https://newsapi.org/v2/everything?qInTitle=+%s&sortBy=relevancy&pageSize=%d&apiKey=%s", formattedQuery, pageSize, apiKey))
+	if err != nil {
+		return nil, err
+	}
+	defer resp.Body.Close()
+
+	body, err := ioutil.ReadAll(resp.Body)
+	if err != nil {
+		return nil, err
+	}
+
+	if resp.StatusCode != 200 {
+		return nil, fmt.Errorf("GetNews failed with status: %d - %s", resp.StatusCode, body)
+	}
+
+	var n newsResponse
+	json.Unmarshal(body, &n)
+	log.Println(n)
+
+	for _, v := range n.Articles {
+		urls = append(urls, v.URL)
+	}
+
+	return urls, nil
 }

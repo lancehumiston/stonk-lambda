@@ -11,6 +11,7 @@ import (
 	"github.com/lancehumiston/stonk-lambda/data"
 	"github.com/lancehumiston/stonk-lambda/market"
 	"github.com/lancehumiston/stonk-lambda/notification"
+	"github.com/lancehumiston/stonk-lambda/url"
 )
 
 var (
@@ -65,6 +66,28 @@ func getFilteredNotifications(stockURIs []string) ([]notification.Stock, error) 
 			return nil, err
 		}
 
+		companyName, err := market.GetCompanyName(symbol)
+		if err != nil {
+			// log and continue for company name query failures
+			log.Println(err)
+		}
+
+		newsURLs, err := market.GetNews(companyName)
+		if err != nil {
+			// log and continue for any news api failures
+			log.Println(err)
+		}
+
+		for i, v := range newsURLs {
+			url, err := url.GetShortenedAlias(v)
+			if err != nil {
+				// log and continue for any url shortening api failures
+				log.Println(err)
+				continue
+			}
+			newsURLs[i] = url
+		}
+
 		notification := notification.Stock{
 			Symbol:          symbol,
 			Gain:            gain,
@@ -77,6 +100,7 @@ func getFilteredNotifications(stockURIs []string) ([]notification.Stock, error) 
 			Hold:            rating.Hold,
 			Sell:            rating.Sell,
 			StrongSell:      rating.StrongSell,
+			NewsURLs:        newsURLs,
 		}
 		notifications = append(notifications, notification)
 	}

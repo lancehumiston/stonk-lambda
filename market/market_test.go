@@ -71,3 +71,59 @@ func TestGetAnalysis_UnknownSymbol_ReturnsEmptyResponse(t *testing.T) {
 		t.Fatalf("Failed with unexpected response: %.2f", data.CurrentPrice.USD)
 	}
 }
+
+func TestGetCompanyName_KnownSymbol_ReturnsCompanyName(t *testing.T) {
+	symbol := "FB"
+
+	name, err := GetCompanyName(symbol)
+
+	if err != nil {
+		t.Fatalf("Failed with unexpected error: %s", err)
+	}
+
+	if name != "Facebook, Inc." {
+		t.Fatalf("Failed with unexpected response: %s", name)
+	}
+}
+
+func TestGetCompanyName_UnknownSymbol_ReturnsEmptyResponse(t *testing.T) {
+	symbol := "NOT_A_SYMBOL"
+
+	name, err := GetCompanyName(symbol)
+
+	if err != nil {
+		t.Fatalf("Failed with unexpected error: %s", err)
+	}
+
+	if name != "" {
+		t.Fatalf("Failed with unexpected response: %s", name)
+	}
+}
+
+func TestGetNews_KnownCompanyName_ReturnsNewsArticles(t *testing.T) {
+	symbol := "Facebook, Inc."
+
+	uris, err := GetNews(symbol)
+
+	if err != nil {
+		t.Fatalf("Failed with unexpected error: %s", err)
+	}
+
+	if len(uris) < 1 {
+		t.Fatal("Failed with unexpected empty response")
+	}
+}
+
+func TestGetNews_UnknownCompanyName_ReturnsEmptyResponse(t *testing.T) {
+	symbol := "NotARealCompany"
+
+	uris, err := GetNews(symbol)
+
+	if err != nil {
+		t.Fatalf("Failed with unexpected error: %s", err)
+	}
+
+	if len(uris) > 0 {
+		t.Fatalf("Failed with unexpected response: %v", uris)
+	}
+}

@@ -12,17 +12,18 @@ import (
 
 // Stock - Stock overview for messaging
 type Stock struct {
-	Symbol          string  `json:"symbol"`
-	Gain            float64 `json:"gain"`
-	CurrentPrice    float64 `json:"currentPrice"`
-	TargetHighPrice float64 `json:"targetHighPrice"`
-	TargetLowPrice  float64 `json:"targetLowPrice"`
-	TargetMeanPrice float64 `json:"targetMeanPrice"`
-	StrongBuy       int64   `json:"strongBuy"`
-	Buy             int64   `json:"buy"`
-	Hold            int64   `json:"hold"`
-	Sell            int64   `json:"sell"`
-	StrongSell      int64   `json:"strongSell"`
+	Symbol          string   `json:"symbol"`
+	Gain            float64  `json:"gain"`
+	CurrentPrice    float64  `json:"currentPrice"`
+	TargetHighPrice float64  `json:"targetHighPrice"`
+	TargetLowPrice  float64  `json:"targetLowPrice"`
+	TargetMeanPrice float64  `json:"targetMeanPrice"`
+	StrongBuy       int64    `json:"strongBuy"`
+	Buy             int64    `json:"buy"`
+	Hold            int64    `json:"hold"`
+	Sell            int64    `json:"sell"`
+	StrongSell      int64    `json:"strongSell"`
+	NewsURLs        []string `json:"newsUrls"`
 }
 
 type notification struct {
@@ -57,7 +58,7 @@ func (n *notification) Send(stocks []Stock) error {
 	client := sns.New(sess)
 
 	var sb strings.Builder
-	sb.WriteString("🚀🚀🚀\n\n")
+	sb.WriteString("🚀🚀🚀")
 	for _, s := range stocks {
 		sb.WriteString(fmt.Sprintf(`
 Symbol: %s
@@ -71,6 +72,7 @@ Buy: %d
 Hold: %d
 Sell: %d
 StrongSell: %d
+%s
 https://robinhood.com/stocks/%s
 `,
 			s.Symbol,
@@ -84,6 +86,7 @@ https://robinhood.com/stocks/%s
 			s.Hold,
 			s.Sell,
 			s.StrongSell,
+			strings.Join(s.NewsURLs, "\n"),
 			s.Symbol))
 	}
 	input := &sns.PublishInput{
