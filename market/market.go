@@ -9,6 +9,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"time"
 )
 
 var (
@@ -206,7 +207,8 @@ func GetNews(companyName string) ([]string, error) {
 	const pageSize int = 3
 	noSuffix := regexp.MustCompile(`(?i)inc\.|(?i)Incorporated|(?i)plc|(?i)corporation|(?i)corp\.|(?i)limited|(?i)ltd\.`).ReplaceAllString(companyName, "")
 	formattedQuery := "+" + strings.Replace(noSuffix, " ", "+", -1)
-	resp, err := http.Get(fmt.Sprintf("https://newsapi.org/v2/everything?qInTitle=+%s&sortBy=relevancy&pageSize=%d&apiKey=%s", formattedQuery, pageSize, apiKey))
+	yesterday := time.Now().UTC().AddDate(0, 0, -1).Format("2006-01-02")
+	resp, err := http.Get(fmt.Sprintf("https://newsapi.org/v2/everything?qInTitle=%s&sortBy=publishedAt&pageSize=%d&apiKey=%s&from=%s&language=en", formattedQuery, pageSize, apiKey, yesterday))
 	if err != nil {
 		return nil, err
 	}
