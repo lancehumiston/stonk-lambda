@@ -8,4 +8,5 @@ Lambda function that pushes data to an SNS topic when a stock from Robinhood's "
     # Zip build for lambda
     $ build-lambda-zip.exe -output main.zip main
 
+### Architecture:
 ![diagram](docs/diagram.png)
