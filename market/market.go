@@ -2,6 +2,7 @@ package market
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io/ioutil"
 	"log"
@@ -9,63 +10,29 @@ import (
 	"os"
 	"regexp"
 	"strings"
-	"time"
 )
 
 var (
-	apiKey string
+	newsAPIKey          string
+	companySuffixRegexp *regexp.Regexp
 )
 
 func init() {
-	apiKey = os.Getenv("NEWS_API_KEY")
+	newsAPIKey = os.Getenv("NEWS_API_KEY")
+	companySuffixRegexp = regexp.MustCompile(`(?i)inc\.|(?i)Incorporated|(?i)plc|(?i)corporation|(?i)corp\.|(?i)limited|(?i)ltd\.`)
 }
 
-type movers struct {
-	InstrumentURIs []string `json:"instruments"`
+// TopMoversProvider - Provides a list of "top mover" stock symbols for the day
+type TopMoversProvider interface {
+	GetTopMovers() ([]string, error)
 }
 
-// GetTopMovers - Returns a list of URIs associated with Robinhood's "Top Movers" list
-func GetTopMovers() ([]string, error) {
-	resp, err := http.Get("https://api.robinhood.com/midlands/tags/tag/top-movers/")
-	if err != nil {
-		return nil, err
+// GetTopMoversProviders - Returns a collection of TopMoversProvider
+func GetTopMoversProviders() []TopMoversProvider {
+	return []TopMoversProvider{
+		&robinhood{},
+		&financialModelingPrep{},
 	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	var m movers
-	json.Unmarshal(body, &m)
-	log.Println(m)
-
-	return m.InstrumentURIs, nil
-}
-
-type instrumentResponse struct {
-	Symbol string `json:"symbol"`
-}
-
-// GetSymbol - Returns ticker symbol associated with the instrumentURI
-func GetSymbol(instrumentURI string) (string, error) {
-	resp, err := http.Get(instrumentURI)
-	if err != nil {
-		return "", err
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return "", err
-	}
-
-	var i instrumentResponse
-	json.Unmarshal(body, &i)
-	log.Println(i)
-
-	return i.Symbol, nil
 }
 
 // RecommendationRating - Stock analyst recommendation rating
@@ -191,45 +158,13 @@ func GetCompanyName(symbol string) (string, error) {
 	return "", nil
 }
 
-type newsResponse struct {
-	Articles []struct {
-		URL string `json:"url"`
-	} `json:"articles"`
-}
-
 // GetNews - Returns URL of news articles related to the company
-func GetNews(companyName string) ([]string, error) {
-	var urls = []string{}
+func GetNews(companyName string) (string, error) {
 	if companyName == "" {
-		return urls, nil
+		return "", errors.New("GetNews failed due to empty companyName")
 	}
 
-	const pageSize int = 3
-	noSuffix := regexp.MustCompile(`(?i)inc\.|(?i)Incorporated|(?i)plc|(?i)corporation|(?i)corp\.|(?i)limited|(?i)ltd\.`).ReplaceAllString(companyName, "")
+	noSuffix := companySuffixRegexp.ReplaceAllString(companyName, "")
 	formattedQuery := "+" + strings.Replace(noSuffix, " ", "+", -1)
-	yesterday := time.Now().UTC().AddDate(0, 0, -1).Format("2006-01-02")
-	resp, err := http.Get(fmt.Sprintf("https://newsapi.org/v2/everything?qInTitle=%s&sortBy=publishedAt&pageSize=%d&apiKey=%s&from=%s&language=en", formattedQuery, pageSize, apiKey, yesterday))
-	if err != nil {
-		return nil, err
-	}
-	defer resp.Body.Close()
-
-	body, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, err
-	}
-
-	if resp.StatusCode != 200 {
-		return nil, fmt.Errorf("GetNews failed with status: %d - %s", resp.StatusCode, body)
-	}
-
-	var n newsResponse
-	json.Unmarshal(body, &n)
-	log.Println(n)
-
-	for _, v := range n.Articles {
-		urls = append(urls, v.URL)
-	}
-
-	return urls, nil
+	return fmt.Sprintf("https://news.google.com/search?q=%s", formattedQuery), nil
 }

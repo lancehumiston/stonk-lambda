@@ -2,32 +2,6 @@ package market
 
 import "testing"
 
-func TestGetTopMovers_Success_ReturnsInstrumentURIs(t *testing.T) {
-	result, err := GetTopMovers()
-
-	if err != nil {
-		t.Fatalf("Failed with unexpected error: %s", err)
-	}
-
-	if result == nil || len(result) != 20 {
-		t.Fatalf("Failed with unexpected response: %v", result)
-	}
-}
-
-func TestGetSymbol_UnknownInstrumentURI_ReturnsEmptyString(t *testing.T) {
-	const instrumentURI string = "https://api.robinhood.com/instruments/unknown-instrumentID/"
-
-	result, err := GetSymbol(instrumentURI)
-
-	if err != nil {
-		t.Fatalf("Failed with unexpected error: %s", err)
-	}
-
-	if result != "" {
-		t.Fatalf("Failed with unexpected response: %v", result)
-	}
-}
-
 func TestGetAnalysis_KnownSymbol_ReturnsGainAndRating(t *testing.T) {
 	symbol := "FB"
 
@@ -101,29 +75,25 @@ func TestGetCompanyName_UnknownSymbol_ReturnsEmptyResponse(t *testing.T) {
 }
 
 func TestGetNews_KnownCompanyName_ReturnsNewsArticles(t *testing.T) {
-	symbol := "Facebook, Inc."
+	companyName := "Facebook, Inc."
 
-	uris, err := GetNews(symbol)
+	uri, err := GetNews(companyName)
 
 	if err != nil {
 		t.Fatalf("Failed with unexpected error: %s", err)
 	}
 
-	if len(uris) < 1 {
+	if uri == "" {
 		t.Fatal("Failed with unexpected empty response")
 	}
 }
 
-func TestGetNews_UnknownCompanyName_ReturnsEmptyResponse(t *testing.T) {
-	symbol := "NotARealCompany"
+func TestGetNews_EmptyCompanyName_ReturnsError(t *testing.T) {
+	companyName := ""
 
-	uris, err := GetNews(symbol)
+	uri, err := GetNews(companyName)
 
-	if err != nil {
-		t.Fatalf("Failed with unexpected error: %s", err)
-	}
-
-	if len(uris) > 0 {
-		t.Fatalf("Failed with unexpected response: %v", uris)
+	if err == nil {
+		t.Fatalf("Failed with unexpected response: %s", uri)
 	}
 }

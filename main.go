@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -32,92 +33,137 @@ func init() {
 	}
 }
 
-// getFilteredStocks - Filters the collection of stockURIs to those that meet the notificaiton criteria
+// getFilteredStocks - Filters the collection of symbols to those that meet the notificaiton criteria
 // and returns a filtered collection of Stock structs
-func getFilteredNotifications(stockURIs []string) ([]notification.Stock, error) {
+func getFilteredStocks(symbols []string) ([]notification.Stock, error) {
 	var notifications []notification.Stock
-	stockRepo := data.New(tableName)
+	stockDataStore := data.New(tableName)
 
-	for _, stock := range stockURIs {
-		symbol, err := market.GetSymbol(stock)
-		if err != nil {
-			return nil, err
-		}
-
-		gain, rating, data, err := market.GetAnalysis(symbol)
-		if err != nil {
-			return nil, err
-		}
-
-		if gain < gainThresholdPercentage {
-			continue
-		}
-
-		exists, err := stockRepo.Exists(symbol)
-		if err != nil {
-			return nil, err
-		}
-		if exists {
-			log.Printf("dynamodb record exists for %s", symbol)
-			continue
-		}
-
-		if err := stockRepo.Insert(symbol, gain); err != nil {
-			return nil, err
-		}
-
-		companyName, err := market.GetCompanyName(symbol)
-		if err != nil {
-			// log and continue for company name query failures
-			log.Println(err)
-		}
-
-		newsURLs, err := market.GetNews(companyName)
-		if err != nil {
-			// log and continue for any news api failures
-			log.Println(err)
-		}
-
-		for i, v := range newsURLs {
-			url, err := url.GetShortenedAlias(v)
+	uniqueSymbols := unique(symbols)
+	ch := make(chan notification.Stock, len(uniqueSymbols))
+	errCh := make(chan error, cap(ch))
+	for _, v := range uniqueSymbols {
+		go func(symbol string, ch chan<- notification.Stock, errCh chan<- error) {
+			gain, rating, data, err := market.GetAnalysis(symbol)
 			if err != nil {
-				// log and continue for any url shortening api failures
-				log.Println(err)
-				continue
+				errCh <- err
+				return
 			}
-			newsURLs[i] = url
-		}
 
-		notification := notification.Stock{
-			Symbol:          symbol,
-			Gain:            gain,
-			CurrentPrice:    data.CurrentPrice.USD,
-			TargetLowPrice:  data.TargetLowPrice.USD,
-			TargetHighPrice: data.TargetHighPrice.USD,
-			TargetMeanPrice: data.TargetMeanPrice.USD,
-			StrongBuy:       rating.StrongBuy,
-			Buy:             rating.Buy,
-			Hold:            rating.Hold,
-			Sell:            rating.Sell,
-			StrongSell:      rating.StrongSell,
-			NewsURLs:        newsURLs,
+			if gain < gainThresholdPercentage {
+				errCh <- fmt.Errorf("%s gain:%.2f is not above threshold:%.2f", symbol, gain, gainThresholdPercentage)
+				return
+			}
+
+			exists, err := stockDataStore.Exists(symbol)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			if exists {
+				errCh <- fmt.Errorf("dynamodb record exists for %s", symbol)
+				return
+			}
+
+			if err := stockDataStore.Insert(symbol, gain); err != nil {
+				errCh <- err
+				return
+			}
+
+			companyName, err := market.GetCompanyName(symbol)
+			if err != nil {
+				errCh <- err
+				return
+			}
+
+			newsURL, err := market.GetNews(companyName)
+			if err != nil {
+				errCh <- err
+				return
+			}
+			shortenedNewsURL, err := url.GetShortenedAlias(newsURL)
+			if err != nil {
+				errCh <- err
+				return
+			}
+
+			ch <- notification.Stock{
+				Symbol:          symbol,
+				Gain:            gain,
+				CurrentPrice:    data.CurrentPrice.USD,
+				TargetLowPrice:  data.TargetLowPrice.USD,
+				TargetHighPrice: data.TargetHighPrice.USD,
+				TargetMeanPrice: data.TargetMeanPrice.USD,
+				StrongBuy:       rating.StrongBuy,
+				Buy:             rating.Buy,
+				Hold:            rating.Hold,
+				Sell:            rating.Sell,
+				StrongSell:      rating.StrongSell,
+				NewsURL:         shortenedNewsURL,
+			}
+		}(v, ch, errCh)
+	}
+
+	for i := 0; i < cap(ch); i++ {
+		select {
+		case notification := <-ch:
+			notifications = append(notifications, notification)
+		case err := <-errCh:
+			log.Println(err) // log and continue with data from other stocks
 		}
-		notifications = append(notifications, notification)
 	}
 
 	return notifications, nil
 }
 
-// lambdaHandler - Entry point
-func lambdaHandler(ctx context.Context, event events.CloudWatchEvent) error {
-	log.Println(event)
-
-	stockURIs, err := market.GetTopMovers()
-	if err != nil {
-		return err
+func unique(items []string) []string {
+	if items == nil || len(items) == 0 {
+		return items
 	}
 
-	filteredStocks, err := getFilteredNotifications(stockURIs)
+	var uniqueItems []string
+	set := make(map[string]struct{})
+	for _, v := range items {
+		if _, ok := set[v]; ok {
+			continue
+		}
+
+		uniqueItems = append(uniqueItems, v)
+		set[v] = struct{}{}
+	}
+
+	return uniqueItems
+}
+
+// lambdaHandler - Entry point
+func lambdaHandler(ctx context.Context, event events.CloudWatchEvent) error {
+	var symbols []string
+	providers := market.GetTopMoversProviders()
+
+	ch := make(chan []string, len(providers))
+	errCh := make(chan error, cap(ch))
+	for _, v := range providers {
+		go func(provider market.TopMoversProvider, ch chan<- []string, errCh chan<- error) {
+			topMovers, err := provider.GetTopMovers()
+			if err != nil {
+				errCh <- err
+				return
+			}
+
+			ch <- topMovers
+		}(v, ch, errCh)
+	}
+
+	for i := 0; i < cap(ch); i++ {
+		select {
+		case topMovers := <-ch:
+			symbols = append(symbols, topMovers...)
+		case err := <-errCh:
+			log.Println(err) // log and continue with data from other providers
+		}
+	}
+
+	filteredStocks, err := getFilteredStocks(symbols)
 	if err != nil {
 		return err
 	}
