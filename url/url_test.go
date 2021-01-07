@@ -1,9 +1,13 @@
 package url
 
-import "testing"
+import (
+	"strings"
+	"testing"
+)
 
 func TestGetShortenedAlias_Success_ReturnsShortenedUrlAlias(t *testing.T) {
 	url := "https://google.com"
+	expectedPrefix := "https://cutt.ly/"
 
 	result, err := GetShortenedAlias(url)
 
@@ -11,7 +15,7 @@ func TestGetShortenedAlias_Success_ReturnsShortenedUrlAlias(t *testing.T) {
 		t.Fatalf("Failed with unexpected error: %s", err)
 	}
 
-	if result == "" {
-		t.Fatal("Failed with unexpected empty response")
+	if !strings.HasPrefix(result, expectedPrefix) {
+		t.Fatalf("Failed with unexpected response:%s", result)
 	}
 }
