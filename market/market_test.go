@@ -5,14 +5,14 @@ import "testing"
 func TestGetAnalysis_KnownSymbol_ReturnsGainAndRating(t *testing.T) {
 	symbol := "FB"
 
-	gain, rating, data, err := GetAnalysis(symbol)
+	price, rating, data, err := GetAnalysis(symbol)
 
 	if err != nil {
 		t.Fatalf("Failed with unexpected error: %s", err)
 	}
 
-	if gain == 0 {
-		t.Fatalf("Failed with unexpected response: %.2f", gain)
+	if price.MarketChange.Percent == 0 || price.PreMarketPrice.USD == 0 {
+		t.Fatalf("Failed with unexpected response: %.2f", price)
 	}
 
 	if rating.Period != "0m" {
@@ -27,14 +27,14 @@ func TestGetAnalysis_KnownSymbol_ReturnsGainAndRating(t *testing.T) {
 func TestGetAnalysis_UnknownSymbol_ReturnsEmptyResponse(t *testing.T) {
 	symbol := "NOT_A_SYMBOL"
 
-	gain, rating, data, err := GetAnalysis(symbol)
+	price, rating, data, err := GetAnalysis(symbol)
 
 	if err != nil {
 		t.Fatalf("Failed with unexpected error: %s", err)
 	}
 
-	if gain != 0 {
-		t.Fatalf("Failed with unexpected response: %.2f", gain)
+	if price.MarketChange.Percent != 0 || price.PreMarketPrice.USD != 0 {
+		t.Fatalf("Failed with unexpected response: %.2f", price)
 	}
 
 	if rating.Period != "" {

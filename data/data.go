@@ -13,17 +13,23 @@ import (
 )
 
 type data struct {
-	TableName string
+	TableName        string
+	ArchiveTableName string
 }
 
 // New - Public constructor for data
-func New(tableName string) *data {
+func New(tableName string, archiveTableName string) *data {
 	if tableName == "" {
 		log.Panic("tableName cannot be empty")
 	}
 
+	if archiveTableName == "" {
+		log.Panic("archiveTableName cannot be empty")
+	}
+
 	return &data{
-		TableName: tableName,
+		TableName:        tableName,
+		ArchiveTableName: archiveTableName,
 	}
 }
 
@@ -68,8 +74,8 @@ func (d *data) Exists(symbol string) (bool, error) {
 	return false, fmt.Errorf("Symbol %s returned wrong record %v", symbol, result.Item)
 }
 
-// Insert - Inserts the stock into the data store
-func (d *data) Insert(symbol string, percentage float64) error {
+// Insert - Inserts the stock into the short-lived cache data store
+func (d *data) Insert(symbol string, percentage float64, price float64) error {
 	item := struct {
 		Symbol     string
 		Percentage float64
@@ -90,6 +96,38 @@ func (d *data) Insert(symbol string, percentage float64) error {
 	input := &dynamodb.PutItemInput{
 		Item:      av,
 		TableName: aws.String(d.TableName),
+	}
+
+	if _, err := svc.PutItem(input); err != nil {
+		return err
+	}
+
+	return d.insertArchive(symbol, price)
+}
+
+// insertArchive - Inserts a record for the stock into the long-lived archive data store
+func (d *data) insertArchive(symbol string, price float64) error {
+	item := struct {
+		Symbol       string
+		Price        float64
+		CreatedAtUtc int64
+	}{
+		Symbol:       symbol,
+		Price:        price,
+		CreatedAtUtc: time.Now().UTC().Unix(),
+	}
+
+	svc := dynamodb.New(session.New())
+
+	av, err := dynamodbattribute.MarshalMap(item)
+	if err != nil {
+		return err
+	}
+
+	input := &dynamodb.PutItemInput{
+		Item:                av,
+		TableName:           aws.String(d.ArchiveTableName),
+		ConditionExpression: aws.String("attribute_not_exists(Symbol)"),
 	}
 
 	result, err := svc.PutItem(input)

@@ -17,6 +17,7 @@ import (
 
 var (
 	tableName               string
+	archiveTableName        string
 	snsTopicArn             string
 	gainThresholdPercentage float64
 )
@@ -25,6 +26,7 @@ func init() {
 	var err error
 
 	tableName = os.Getenv("TABLE_NAME")
+	archiveTableName = os.Getenv("ARCHIVE_TABLE_NAME")
 	snsTopicArn = os.Getenv("SNS_TOPIC_ARN")
 	threshold := os.Getenv("GAIN_THRESHOLD")
 	if gainThresholdPercentage, err = strconv.ParseFloat(threshold, 64); err != nil {
@@ -37,21 +39,27 @@ func init() {
 // and returns a filtered collection of Stock structs
 func getFilteredStocks(symbols []string) ([]notification.Stock, error) {
 	var notifications []notification.Stock
-	stockDataStore := data.New(tableName)
+	stockDataStore := data.New(tableName, archiveTableName)
 
 	uniqueSymbols := unique(symbols)
 	ch := make(chan notification.Stock, len(uniqueSymbols))
 	errCh := make(chan error, cap(ch))
 	for _, v := range uniqueSymbols {
 		go func(symbol string, ch chan<- notification.Stock, errCh chan<- error) {
-			gain, rating, data, err := market.GetAnalysis(symbol)
+			price, rating, data, err := market.GetAnalysis(symbol)
 			if err != nil {
 				errCh <- err
 				return
 			}
 
-			if gain < gainThresholdPercentage {
-				errCh <- fmt.Errorf("%s gain:%.2f is not above threshold:%.2f", symbol, gain, gainThresholdPercentage)
+			gainPercentage := price.MarketChange.Percent
+			if gainPercentage < gainThresholdPercentage {
+				errCh <- fmt.Errorf("%s gain:%.2f is not above threshold:%.2f", symbol, gainPercentage, gainThresholdPercentage)
+				return
+			}
+			preMarketPrice := price.PreMarketPrice.USD
+			if preMarketPrice > data.CurrentPrice.USD {
+				errCh <- fmt.Errorf("%s preMarketPrice:%.2f is above currentPrice:%.2f", symbol, preMarketPrice, data.CurrentPrice.USD)
 				return
 			}
 
@@ -65,7 +73,7 @@ func getFilteredStocks(symbols []string) ([]notification.Stock, error) {
 				return
 			}
 
-			if err := stockDataStore.Insert(symbol, gain); err != nil {
+			if err := stockDataStore.Insert(symbol, gainPercentage, data.CurrentPrice.USD); err != nil {
 				errCh <- err
 				return
 			}
@@ -89,7 +97,7 @@ func getFilteredStocks(symbols []string) ([]notification.Stock, error) {
 
 			ch <- notification.Stock{
 				Symbol:          symbol,
-				Gain:            gain,
+				Gain:            gainPercentage,
 				CurrentPrice:    data.CurrentPrice.USD,
 				TargetLowPrice:  data.TargetLowPrice.USD,
 				TargetHighPrice: data.TargetHighPrice.USD,

@@ -61,17 +61,22 @@ type FinancialData struct {
 	} `json:"targetMeanPrice"`
 }
 
+type Price struct {
+	MarketChange struct {
+		Percent float64 `json:"raw"`
+	} `json:"regularMarketChangePercent"`
+	PreMarketPrice struct {
+		USD float64 `json:"raw"`
+	} `json:"preMarketPrice"`
+}
+
 type quoteResponse struct {
 	Summary struct {
 		Result []struct {
 			RecommendationTrend struct {
 				Trend []RecommendationRating `json:"trend"`
 			} `json:"recommendationTrend"`
-			Price struct {
-				MarketChange struct {
-					Percent float64 `json:"raw"`
-				} `json:"regularMarketChangePercent"`
-			} `json:"price"`
+			Price         Price         `json:"price"`
 			FinancialData FinancialData `json:"financialData"`
 		} `json:"result"`
 		Error interface{} `json:"error"`
@@ -79,24 +84,25 @@ type quoteResponse struct {
 }
 
 // GetAnalysis - Calculates the gain percentage from previous close to current and fetches analyst recommendation rating
-func GetAnalysis(symbol string) (float64, RecommendationRating, FinancialData, error) {
+func GetAnalysis(symbol string) (Price, RecommendationRating, FinancialData, error) {
 	var rating RecommendationRating
 	var data FinancialData
+	var price Price
 
 	resp, err := http.Get(fmt.Sprintf("https://query2.finance.yahoo.com/v10/finance/quoteSummary/%s?region=US&modules=recommendationTrend%%2Cprice%%2CfinancialData", symbol))
 	if err != nil {
-		return 0, rating, data, err
+		return price, rating, data, err
 	}
 	defer resp.Body.Close()
 
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
-		return 0, rating, data, err
+		return price, rating, data, err
 	}
 
 	if resp.StatusCode == 404 {
 		log.Printf("Symbol not found:%s", symbol)
-		return 0, rating, data, err
+		return price, rating, data, err
 	}
 
 	var q quoteResponse
@@ -104,14 +110,14 @@ func GetAnalysis(symbol string) (float64, RecommendationRating, FinancialData, e
 	log.Println(q)
 
 	if q.Summary.Error != nil {
-		return 0, rating, data, fmt.Errorf("%v", q.Summary.Error)
+		return price, rating, data, fmt.Errorf("%v", q.Summary.Error)
 	}
 	if len(q.Summary.Result) < 1 {
-		return 0, rating, data, nil
+		return price, rating, data, nil
 	}
 	result := q.Summary.Result[0]
 
-	gain := result.Price.MarketChange.Percent
+	result.Price.MarketChange.Percent = result.Price.MarketChange.Percent * 100
 	data.CurrentPrice = result.FinancialData.CurrentPrice
 	if len(result.RecommendationTrend.Trend) > 0 {
 		rating = result.RecommendationTrend.Trend[0]
@@ -120,7 +126,7 @@ func GetAnalysis(symbol string) (float64, RecommendationRating, FinancialData, e
 		data.TargetMeanPrice = result.FinancialData.TargetMeanPrice
 	}
 
-	return gain * 100, rating, data, nil
+	return result.Price, rating, data, nil
 }
 
 type companyResponse struct {
