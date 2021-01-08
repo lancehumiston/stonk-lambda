@@ -63,7 +63,7 @@ func getFilteredStocks(symbols []string) ([]notification.Stock, error) {
 				errCh <- fmt.Errorf("%s preMarketPrice:%.2f is above currentPrice:%.2f", symbol, preMarketPrice, data.CurrentPrice.USD)
 				return
 			}
-			log.Printf("%s currentPrice:%.2f is above preMarketPrice:%.2f", symbol, preMarketPrice, data.CurrentPrice.USD)
+			log.Printf("%s currentPrice:%.2f is above preMarketPrice:%.2f", symbol, data.CurrentPrice.USD, preMarketPrice)
 
 			exists, err := stockDataStore.Exists(symbol)
 			if err != nil {
