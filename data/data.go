@@ -127,15 +127,17 @@ func (d *data) insertArchive(symbol string, price float64) error {
 	input := &dynamodb.PutItemInput{
 		Item:                av,
 		TableName:           aws.String(d.ArchiveTableName),
-		ConditionExpression: aws.String("attribute_not_exists(Symbol)"),
+		ConditionExpression: aws.String("attribute_not_exists(Symbol)"), // ensure item `Symbol` is unique
 	}
 
-	result, err := svc.PutItem(input)
-	if err != nil {
+	_, err = svc.PutItem(input)
+	if err == nil {
+		return nil
+	}
+	aerr, ok := err.(awserr.Error)
+	if !ok || aerr.Code() != dynamodb.ErrCodeConditionalCheckFailedException {
 		return err
 	}
-
-	log.Println(result)
 
 	return nil
 }
