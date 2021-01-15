@@ -45,29 +45,28 @@ type RecommendationRating struct {
 	StrongSell int64  `json:"strongSell"`
 }
 
-// FinancialData - Stock financial data
-type FinancialData struct {
-	CurrentPrice struct {
-		USD float64 `json:"raw"`
-	} `json:"currentPrice"`
-	TargetHighPrice struct {
-		USD float64 `json:"raw"`
-	} `json:"targetHighPrice"`
-	TargetLowPrice struct {
-		USD float64 `json:"raw"`
-	} `json:"targetLowPrice"`
-	TargetMeanPrice struct {
-		USD float64 `json:"raw"`
-	} `json:"targetMeanPrice"`
+// Currency - Currency data
+type Currency struct {
+	USD float64 `json:"raw"`
 }
 
+// Percent - Percent data
+type Percent struct {
+	Percent float64 `json:"raw"`
+}
+
+// FinancialData - Stock financial data
+type FinancialData struct {
+	CurrentPrice    Currency `json:"currentPrice"`
+	TargetHighPrice Currency `json:"targetHighPrice"`
+	TargetLowPrice  Currency `json:"targetLowPrice"`
+	TargetMeanPrice Currency `json:"targetMeanPrice"`
+}
+
+// Price - Price data
 type Price struct {
-	MarketChange struct {
-		Percent float64 `json:"raw"`
-	} `json:"regularMarketChangePercent"`
-	PreMarketPrice struct {
-		USD float64 `json:"raw"`
-	} `json:"preMarketPrice"`
+	MarketChange   Percent  `json:"regularMarketChangePercent"`
+	PreMarketPrice Currency `json:"preMarketPrice"`
 }
 
 type quoteResponse struct {

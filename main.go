@@ -35,6 +35,35 @@ func init() {
 	}
 }
 
+// validateAgainstTresholds - Verifies that the symbol meets notification thresholds based on price and financialData
+func validateAgainstTresholds(symbol string, price market.Price, rating market.RecommendationRating, financialData market.FinancialData) error {
+	gainPercentage := price.MarketChange.Percent
+	if gainPercentage < gainThresholdPercentage {
+		return fmt.Errorf("%s gain:%.2f is not above threshold:%.2f", symbol, gainPercentage, gainThresholdPercentage)
+	}
+	log.Printf("%s gain:%.2f is above threshold:%.2f", symbol, gainPercentage, gainThresholdPercentage)
+
+	preMarketPrice := price.PreMarketPrice.USD
+	currentPrice := financialData.CurrentPrice.USD
+	if preMarketPrice > currentPrice {
+		return fmt.Errorf("%s preMarketPrice:%.2f is above currentPrice:%.2f", symbol, preMarketPrice, financialData.CurrentPrice.USD)
+	}
+	log.Printf("%s currentPrice:%.2f is above preMarketPrice:%.2f", symbol, financialData.CurrentPrice.USD, preMarketPrice)
+
+	targetHighPrice := financialData.TargetHighPrice.USD
+	if targetHighPrice > currentPrice {
+		log.Printf("%s targetHighPrice:%.2f is above currentPrice:%.2f", symbol, targetHighPrice, currentPrice)
+		return nil
+	}
+
+	if rating.StrongBuy > 0 || rating.Buy > 0 {
+		log.Printf("%s has strongBuy:%d buy:%d rating", symbol, rating.StrongBuy, rating.Buy)
+		return nil
+	}
+
+	return fmt.Errorf("%s targetHighPrice:%.2f currentPrice:%.2f strongBuy:%d buy:%d", symbol, targetHighPrice, currentPrice, rating.StrongBuy, rating.Buy)
+}
+
 // getFilteredStocks - Filters the collection of symbols to those that meet the notificaiton criteria
 // and returns a filtered collection of Stock structs
 func getFilteredStocks(symbols []string) ([]notification.Stock, error) {
@@ -52,18 +81,10 @@ func getFilteredStocks(symbols []string) ([]notification.Stock, error) {
 				return
 			}
 
-			gainPercentage := price.MarketChange.Percent
-			if gainPercentage < gainThresholdPercentage {
-				errCh <- fmt.Errorf("%s gain:%.2f is not above threshold:%.2f", symbol, gainPercentage, gainThresholdPercentage)
+			if err = validateAgainstTresholds(symbol, price, rating, data); err != nil {
+				errCh <- err
 				return
 			}
-			log.Printf("%s gain:%.2f is above threshold:%.2f", symbol, gainPercentage, gainThresholdPercentage)
-			preMarketPrice := price.PreMarketPrice.USD
-			if preMarketPrice > data.CurrentPrice.USD {
-				errCh <- fmt.Errorf("%s preMarketPrice:%.2f is above currentPrice:%.2f", symbol, preMarketPrice, data.CurrentPrice.USD)
-				return
-			}
-			log.Printf("%s currentPrice:%.2f is above preMarketPrice:%.2f", symbol, data.CurrentPrice.USD, preMarketPrice)
 
 			exists, err := stockDataStore.Exists(symbol)
 			if err != nil {
@@ -75,6 +96,7 @@ func getFilteredStocks(symbols []string) ([]notification.Stock, error) {
 				return
 			}
 
+			gainPercentage := price.MarketChange.Percent
 			if err := stockDataStore.Insert(symbol, gainPercentage, data.CurrentPrice.USD); err != nil {
 				errCh <- err
 				return
