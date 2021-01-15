@@ -50,9 +50,9 @@ func validateAgainstTresholds(symbol string, price market.Price, rating market.R
 	}
 	log.Printf("%s currentPrice:%.2f is above preMarketPrice:%.2f", symbol, financialData.CurrentPrice.USD, preMarketPrice)
 
-	targetHighPrice := financialData.TargetHighPrice.USD
+	targetHighPrice := financialData.TargetMeanPrice.USD
 	if targetHighPrice > currentPrice {
-		log.Printf("%s targetHighPrice:%.2f is above currentPrice:%.2f", symbol, targetHighPrice, currentPrice)
+		log.Printf("%s targetMeanPrice:%.2f is above currentPrice:%.2f", symbol, targetHighPrice, currentPrice)
 		return nil
 	}
 
@@ -61,7 +61,7 @@ func validateAgainstTresholds(symbol string, price market.Price, rating market.R
 		return nil
 	}
 
-	return fmt.Errorf("%s targetHighPrice:%.2f currentPrice:%.2f strongBuy:%d buy:%d", symbol, targetHighPrice, currentPrice, rating.StrongBuy, rating.Buy)
+	return fmt.Errorf("%s targetMeanPrice:%.2f currentPrice:%.2f strongBuy:%d buy:%d", symbol, targetHighPrice, currentPrice, rating.StrongBuy, rating.Buy)
 }
 
 // getFilteredStocks - Filters the collection of symbols to those that meet the notificaiton criteria

@@ -79,7 +79,7 @@ var validateAgainstTresholdsTCs = []testCase{
 			CurrentPrice: market.Currency{
 				USD: 15,
 			},
-			TargetHighPrice: market.Currency{},
+			TargetMeanPrice: market.Currency{},
 		},
 		expected: nil,
 	},
@@ -101,7 +101,7 @@ var validateAgainstTresholdsTCs = []testCase{
 			CurrentPrice: market.Currency{
 				USD: 15,
 			},
-			TargetHighPrice: market.Currency{},
+			TargetMeanPrice: market.Currency{},
 		},
 		expected: nil,
 	},
@@ -121,7 +121,7 @@ var validateAgainstTresholdsTCs = []testCase{
 			CurrentPrice: market.Currency{
 				USD: 15,
 			},
-			TargetHighPrice: market.Currency{
+			TargetMeanPrice: market.Currency{
 				USD: 16,
 			},
 		},
@@ -145,7 +145,7 @@ var validateAgainstTresholdsTCs = []testCase{
 			CurrentPrice: market.Currency{
 				USD: 15,
 			},
-			TargetHighPrice: market.Currency{},
+			TargetMeanPrice: market.Currency{},
 		},
 		expected: errors.New("GNOG gain:49.00 is not above threshold:50.00"),
 	},
@@ -167,12 +167,12 @@ var validateAgainstTresholdsTCs = []testCase{
 			CurrentPrice: market.Currency{
 				USD: 10,
 			},
-			TargetHighPrice: market.Currency{},
+			TargetMeanPrice: market.Currency{},
 		},
 		expected: errors.New("GNOG preMarketPrice:15.00 is above currentPrice:10.00"),
 	},
 	{
-		name:   "Fail no targetHighPrice, strongBuy, or buy",
+		name:   "Fail no targetMeanPrice, strongBuy, or buy",
 		symbol: "GNOG",
 		price: market.Price{
 			MarketChange: market.Percent{
@@ -187,9 +187,9 @@ var validateAgainstTresholdsTCs = []testCase{
 			CurrentPrice: market.Currency{
 				USD: 15,
 			},
-			TargetHighPrice: market.Currency{},
+			TargetMeanPrice: market.Currency{},
 		},
-		expected: errors.New("GNOG targetHighPrice:0.00 currentPrice:15.00 strongBuy:0 buy:0"),
+		expected: errors.New("GNOG targetMeanPrice:0.00 currentPrice:15.00 strongBuy:0 buy:0"),
 	},
 }
 
