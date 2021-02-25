@@ -62,36 +62,14 @@ type testCase struct {
 
 var validateAgainstTresholdsTCs = []testCase{
 	{
-		name:   "Success strongbuy rating",
+		name:   "Success targetMeanPrice > 1.5*currentPrice w/ buy rating",
 		symbol: "GNOG",
 		price: market.Price{
 			MarketChange: market.Percent{
 				Percent: gainThreshold,
 			},
 			PreMarketPrice: market.Currency{
-				USD: 10,
-			},
-		},
-		rating: market.RecommendationRating{
-			StrongBuy: 1,
-		},
-		financialData: market.FinancialData{
-			CurrentPrice: market.Currency{
-				USD: 15,
-			},
-			TargetMeanPrice: market.Currency{},
-		},
-		expected: nil,
-	},
-	{
-		name:   "Success buy rating",
-		symbol: "GNOG",
-		price: market.Price{
-			MarketChange: market.Percent{
-				Percent: gainThreshold,
-			},
-			PreMarketPrice: market.Currency{
-				USD: 10,
+				USD: 9,
 			},
 		},
 		rating: market.RecommendationRating{
@@ -99,30 +77,34 @@ var validateAgainstTresholdsTCs = []testCase{
 		},
 		financialData: market.FinancialData{
 			CurrentPrice: market.Currency{
+				USD: 10,
+			},
+			TargetMeanPrice: market.Currency{
 				USD: 15,
 			},
-			TargetMeanPrice: market.Currency{},
 		},
 		expected: nil,
 	},
 	{
-		name:   "Success targetPrice above currentPrice",
+		name:   "Success targetMeanPrice > 1.5*currentPrice w/ strongBuy rating",
 		symbol: "GNOG",
 		price: market.Price{
 			MarketChange: market.Percent{
 				Percent: gainThreshold,
 			},
 			PreMarketPrice: market.Currency{
-				USD: 10,
+				USD: 9,
 			},
 		},
-		rating: market.RecommendationRating{},
+		rating: market.RecommendationRating{
+			StrongBuy: 1,
+		},
 		financialData: market.FinancialData{
 			CurrentPrice: market.Currency{
-				USD: 15,
+				USD: 10,
 			},
 			TargetMeanPrice: market.Currency{
-				USD: 16,
+				USD: 15,
 			},
 		},
 		expected: nil,
@@ -172,7 +154,7 @@ var validateAgainstTresholdsTCs = []testCase{
 		expected: errors.New("GNOG preMarketPrice:15.00 is above currentPrice:10.00"),
 	},
 	{
-		name:   "Fail no targetMeanPrice, strongBuy, or buy",
+		name:   "Fail no targetMeanPrice",
 		symbol: "GNOG",
 		price: market.Price{
 			MarketChange: market.Percent{
@@ -182,14 +164,86 @@ var validateAgainstTresholdsTCs = []testCase{
 				USD: 10,
 			},
 		},
-		rating: market.RecommendationRating{},
+		rating: market.RecommendationRating{
+			Buy: 1,
+		},
 		financialData: market.FinancialData{
 			CurrentPrice: market.Currency{
 				USD: 15,
 			},
 			TargetMeanPrice: market.Currency{},
 		},
-		expected: errors.New("GNOG targetMeanPrice:0.00 currentPrice:15.00 strongBuy:0 buy:0"),
+		expected: errors.New("GNOG targetMeanPrice:0.00 is less than fiftyPercentGainPrice:22.50 currentPrice:15.00"),
+	},
+	{
+		name:   "Fail sell",
+		symbol: "GNOG",
+		price: market.Price{
+			MarketChange: market.Percent{
+				Percent: gainThreshold,
+			},
+			PreMarketPrice: market.Currency{
+				USD: 9,
+			},
+		},
+		rating: market.RecommendationRating{
+			Sell: 1,
+		},
+		financialData: market.FinancialData{
+			CurrentPrice: market.Currency{
+				USD: 10,
+			},
+			TargetMeanPrice: market.Currency{
+				USD: 15,
+			},
+		},
+		expected: errors.New("GNOG has sell:1 strongSell:0 rating"),
+	},
+	{
+		name:   "Fail strongSell",
+		symbol: "GNOG",
+		price: market.Price{
+			MarketChange: market.Percent{
+				Percent: gainThreshold,
+			},
+			PreMarketPrice: market.Currency{
+				USD: 9,
+			},
+		},
+		rating: market.RecommendationRating{
+			StrongSell: 1,
+		},
+		financialData: market.FinancialData{
+			CurrentPrice: market.Currency{
+				USD: 10,
+			},
+			TargetMeanPrice: market.Currency{
+				USD: 15,
+			},
+		},
+		expected: errors.New("GNOG has sell:0 strongSell:1 rating"),
+	},
+	{
+		name:   "Fail no buy or strongBuy",
+		symbol: "GNOG",
+		price: market.Price{
+			MarketChange: market.Percent{
+				Percent: gainThreshold,
+			},
+			PreMarketPrice: market.Currency{
+				USD: 9,
+			},
+		},
+		rating: market.RecommendationRating{},
+		financialData: market.FinancialData{
+			CurrentPrice: market.Currency{
+				USD: 10,
+			},
+			TargetMeanPrice: market.Currency{
+				USD: 15,
+			},
+		},
+		expected: errors.New("GNOG has buy:0 strongBuy:0 rating"),
 	},
 }
 

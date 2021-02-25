@@ -17,7 +17,6 @@ import (
 
 var (
 	tableName               string
-	archiveTableName        string
 	snsTopicArn             string
 	gainThresholdPercentage float64
 )
@@ -26,7 +25,6 @@ func init() {
 	var err error
 
 	tableName = os.Getenv("TABLE_NAME")
-	archiveTableName = os.Getenv("ARCHIVE_TABLE_NAME")
 	snsTopicArn = os.Getenv("SNS_TOPIC_ARN")
 	threshold := os.Getenv("GAIN_THRESHOLD")
 	if gainThresholdPercentage, err = strconv.ParseFloat(threshold, 64); err != nil {
@@ -50,25 +48,28 @@ func validateAgainstTresholds(symbol string, price market.Price, rating market.R
 	}
 	log.Printf("%s currentPrice:%.2f is above preMarketPrice:%.2f", symbol, financialData.CurrentPrice.USD, preMarketPrice)
 
-	targetHighPrice := financialData.TargetMeanPrice.USD
-	if targetHighPrice > currentPrice {
-		log.Printf("%s targetMeanPrice:%.2f is above currentPrice:%.2f", symbol, targetHighPrice, currentPrice)
-		return nil
+	if rating.Sell > 0 || rating.StrongSell > 0 {
+		return fmt.Errorf("%s has sell:%d strongSell:%d rating", symbol, rating.Sell, rating.StrongSell)
 	}
 
-	if rating.StrongBuy > 0 || rating.Buy > 0 {
-		log.Printf("%s has strongBuy:%d buy:%d rating", symbol, rating.StrongBuy, rating.Buy)
-		return nil
+	if rating.Buy == 0 && rating.StrongBuy == 0 {
+		return fmt.Errorf("%s has buy:%d strongBuy:%d rating", symbol, rating.Buy, rating.StrongBuy)
 	}
 
-	return fmt.Errorf("%s targetMeanPrice:%.2f currentPrice:%.2f strongBuy:%d buy:%d", symbol, targetHighPrice, currentPrice, rating.StrongBuy, rating.Buy)
+	targetMeanPrice := financialData.TargetMeanPrice.USD
+	fiftyPercentGainPrice := currentPrice * 1.5
+	if targetMeanPrice < fiftyPercentGainPrice {
+		return fmt.Errorf("%s targetMeanPrice:%.2f is less than fiftyPercentGainPrice:%.2f currentPrice:%.2f", symbol, targetMeanPrice, fiftyPercentGainPrice, currentPrice)
+	}
+
+	return nil
 }
 
 // getFilteredStocks - Filters the collection of symbols to those that meet the notificaiton criteria
 // and returns a filtered collection of Stock structs
 func getFilteredStocks(symbols []string) ([]notification.Stock, error) {
 	var notifications []notification.Stock
-	stockDataStore := data.New(tableName, archiveTableName)
+	stockDataStore := data.New(tableName)
 
 	uniqueSymbols := unique(symbols)
 	ch := make(chan notification.Stock, len(uniqueSymbols))

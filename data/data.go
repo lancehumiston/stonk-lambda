@@ -13,23 +13,17 @@ import (
 )
 
 type data struct {
-	TableName        string
-	ArchiveTableName string
+	TableName string
 }
 
 // New - Public constructor for data
-func New(tableName string, archiveTableName string) *data {
+func New(tableName string) *data {
 	if tableName == "" {
 		log.Panic("tableName cannot be empty")
 	}
 
-	if archiveTableName == "" {
-		log.Panic("archiveTableName cannot be empty")
-	}
-
 	return &data{
-		TableName:        tableName,
-		ArchiveTableName: archiveTableName,
+		TableName: tableName,
 	}
 }
 
@@ -77,13 +71,17 @@ func (d *data) Exists(symbol string) (bool, error) {
 // Insert - Inserts the stock into the short-lived cache data store
 func (d *data) Insert(symbol string, percentage float64, price float64) error {
 	item := struct {
-		Symbol     string
-		Percentage float64
-		TTL        int64
+		Symbol       string
+		Percentage   float64
+		Price        float64
+		CreatedAtUtc int64
+		TTL          int64
 	}{
-		Symbol:     symbol,
-		Percentage: percentage,
-		TTL:        getItemTTL(time.Now().UTC()),
+		Symbol:       symbol,
+		Percentage:   percentage,
+		Price:        price,
+		CreatedAtUtc: time.Now().UTC().Unix(),
+		TTL:          getItemTTL(time.Now().UTC()),
 	}
 
 	svc := dynamodb.New(session.New())
@@ -99,43 +97,6 @@ func (d *data) Insert(symbol string, percentage float64, price float64) error {
 	}
 
 	if _, err := svc.PutItem(input); err != nil {
-		return err
-	}
-
-	return d.insertArchive(symbol, price)
-}
-
-// insertArchive - Inserts a record for the stock into the long-lived archive data store
-func (d *data) insertArchive(symbol string, price float64) error {
-	item := struct {
-		Symbol       string
-		Price        float64
-		CreatedAtUtc int64
-	}{
-		Symbol:       symbol,
-		Price:        price,
-		CreatedAtUtc: time.Now().UTC().Unix(),
-	}
-
-	svc := dynamodb.New(session.New())
-
-	av, err := dynamodbattribute.MarshalMap(item)
-	if err != nil {
-		return err
-	}
-
-	input := &dynamodb.PutItemInput{
-		Item:                av,
-		TableName:           aws.String(d.ArchiveTableName),
-		ConditionExpression: aws.String("attribute_not_exists(Symbol)"), // ensure item `Symbol` is unique
-	}
-
-	_, err = svc.PutItem(input)
-	if err == nil {
-		return nil
-	}
-	aerr, ok := err.(awserr.Error)
-	if !ok || aerr.Code() != dynamodb.ErrCodeConditionalCheckFailedException {
 		return err
 	}
 
