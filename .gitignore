@@ -1,10 +1,7 @@
-# VSCode
-.vscode
-!.vscode/launch.json
-
-main.zip
-
 # ignore files without extension
 *
-!/**/
+!*/
 !*.*
+
+*.exe
+*.zip
